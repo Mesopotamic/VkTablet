@@ -15,7 +15,9 @@ set(VkTablet_INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/Include CACHE PATH
 # Used to interact with the library, they are all in include/VkTablet
 set(HeaderPath ${CMAKE_CURRENT_LIST_DIR}/Include/VkTablet)
 set(VkTabletHeaders
-	${HeaderPath}/VkTablet.h)
+	${HeaderPath}/VkTablet.h
+	${HeaderPath}/VkTabletEnums.h
+	${HeaderPath}/VkTabletInstance.h)
 
 # Create the library target, we need to add at lease one C file so that
 # CMake can determine the linker language 
@@ -36,8 +38,9 @@ endif()
 # Add in the VkClay cmake list
 add_subdirectory(${VK_CLAY_ROOT} VkClay)
 
-# Link to VkClay
-target_link_libraries(VkTablet PRIVATE VkClay)
+# Link and include VkClay
+target_include_directories(VkTablet PUBLIC ${VkClay_INCLUDE_DIRS})
+target_link_libraries(VkTablet PUBLIC VkClay)
 
 ######################################################################################
 
