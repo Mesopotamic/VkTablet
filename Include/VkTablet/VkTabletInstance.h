@@ -42,5 +42,27 @@ vkt_enum vkt_InstanceFactoryRT(VkInstanceCreateInfo* pInstanceCI);
  */
 vkt_enum vkt_InstanceAttachDebugUtils(VkInstanceCreateInfo* pInstanceCI);
 
+/**
+ * @brief Tries to free the instance create info created by tablet methodologies
+ * @param pInstanceCI Pointer to the create info to free
+ * @returns vkt success code, 0 on success
+ */
 vkt_enum vkt_InstanceFactoryFreeCreateInfo(VkInstanceCreateInfo* pInstanceCI);
+
+/**
+ * @brief Fills the contents of a Debug Utils Messenger create info which has default behaviour. Does no heap
+ * allocations
+ * @param pMessengerCI Pointer to the create info to fill
+ * @returns vkt success code, 0 on success. vkt_nomessenger if messenger is not supported
+ */
+vkt_enum vkt_DebugMessengerFactory(VkDebugUtilsMessengerCreateInfoEXT* pMessengerCI);
+
+/**
+ * @brief Automatically creates a debug messenger using the default create info in tablet, and cleans up the
+ * create info
+ * @param instance Vulkan handle to the instance
+ * @param pMessenger Pointer to the Debug Utils Messenger to be created
+ * @returns vkt success code, 0 on success. vkt_nomessenger if messenger is not supported
+ */
+vkt_enum vkt_DebugMessengerCreateDefault(VkInstance instance, VkDebugUtilsMessengerEXT* pMessenger);
 #endif  // !__VK_TABLET_INSTANCE_H__

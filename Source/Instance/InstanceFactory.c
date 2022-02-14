@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdio.h>  // For the debug callback messenger
+
 // Validation layer name
 const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
 
@@ -15,6 +17,9 @@ uint32_t m_instanceExtPropsCount = 0;
 // Variables used to cache the layer properties
 VkLayerProperties* m_layerProps = NULL;
 uint32_t m_layerPropsCount = 0;
+
+// A boolean to store if we suport debug messengers being created
+bool m_debugMessengerSupported = false;
 
 VkExtensionProperties* vkt_InstanceGetExtensionProps(uint32_t* pExtCount)
 {
@@ -100,6 +105,18 @@ vkt_enum vkt_InstanceFactoryRT(VkInstanceCreateInfo* pInstanceCI)
 
     err = vkt_InstanceAttachDebugUtils(pInstanceCI);
     if (err != vkt_success) return err;
+
+    // Raytracing devices need to be instance version 1.1 minimum
+    VkApplicationInfo* appInfo = malloc(sizeof(VkApplicationInfo));
+    if (appInfo == NULL) {
+        return vkt_unknownfail;
+    }
+    memcpy(appInfo, pInstanceCI->pApplicationInfo, sizeof(VkApplicationInfo));
+    appInfo->apiVersion = VK_MAKE_VERSION(1, 1, 0);
+
+    // Replace the app info in the instance create info
+    free(pInstanceCI->pApplicationInfo);
+    pInstanceCI->pApplicationInfo = appInfo;
 
     return vkt_success;
 }
@@ -234,6 +251,9 @@ vkt_enum vkt_InstanceAttachDebugUtils(VkInstanceCreateInfo* pInstanceCI)
             // Found the debug utils extension, so append it to the requested extensions
             requestedInstanceExtensions[validatedExtCount] = "VK_EXT_debug_utils";
             validatedExtCount++;
+
+            // Mark that validation callbacks will be supported
+            m_debugMessengerSupported = true;
             break;
         }
     }
@@ -266,7 +286,7 @@ vkt_enum vkt_InstanceAttachDebugUtils(VkInstanceCreateInfo* pInstanceCI)
                requestedInstanceExtensions[i], extNameSize);
     }
     // Free and replace the old instance extensions list
-    if(pInstanceCI->ppEnabledExtensionNames != NULL) {
+    if (pInstanceCI->ppEnabledExtensionNames != NULL) {
         free(pInstanceCI->ppEnabledExtensionNames);
     }
     pInstanceCI->ppEnabledExtensionNames = validatedInstanceExtensions;
@@ -323,4 +343,66 @@ vkt_enum vkt_InstanceFactoryFreeCreateInfo(VkInstanceCreateInfo* pInstanceCI)
         free(pNext);
         pNext = next;
     }
+}
+
+/**
+ * Default debug messenger callback for tablet
+ */
+static VKAPI_ATTR VkBool32 VKAPI_CALL vkt_debugCallback(
+  VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+  const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
+{
+    printf("Message from validation layers : %s\n", pCallbackData->pMessage);
+}
+
+vkt_enum vkt_DebugMessengerFactory(VkDebugUtilsMessengerCreateInfoEXT* pMessengerCI)
+{
+    // Check that if the messenger is supported, this variable is controlled by vkt_InstanceAttachDebugUtils
+    if (!m_debugMessengerSupported) {
+        return vkt_nomessenger;
+    }
+
+    // Null pointer check the passed pointer
+    if (pMessengerCI == NULL) {
+        return vkt_nullpointer;
+    }
+
+    // reset the create info
+    memset(pMessengerCI, 0, sizeof(VkDebugUtilsMessengerCreateInfoEXT));
+    pMessengerCI->sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+
+    // Set a bitmask of which severity of events will call our debug messengers
+    pMessengerCI->messageSeverity =
+      VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+
+    // Set a bitmask of which type of events will call our debug messenger
+    pMessengerCI->messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+    // Make the validation layers use our internal function by default
+    pMessengerCI->pfnUserCallback = vkt_debugCallback;
+
+    return vkt_success;
+}
+
+vkt_enum vkt_DebugMessengerCreateDefault(VkInstance instance, VkDebugUtilsMessengerEXT* pMessenger)
+{
+    // Null pointer check
+    if (pMessenger == NULL) {
+        return vkt_nullpointer;
+    }
+
+    VkDebugUtilsMessengerCreateInfoEXT info;
+    vkt_enum err = vkt_DebugMessengerFactory(&info);
+    if (err != vkt_success) {
+        return err;
+    }
+
+    // Create the actual messenger
+    if (vkCreateDebugUtilsMessengerEXT(instance, &info, NULL, pMessenger) != VK_SUCCESS) {
+        return vkt_unknownfail;
+    }
+
+    return vkt_success;
 }
